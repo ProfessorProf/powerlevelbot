@@ -5,88 +5,81 @@ sql.open('./data.sqlite');
 const hour = (60 * 60 * 1000);
 
 const updateSql = `
-ALTER TABLE Players ADD COLUMN Legacy_Glory INTEGER`;
+ALTER TABLE Players ADD COLUMN Intent INTEGER;
+CREATE TABLE IF NOT EXISTS PlayerTechniques (ID INTEGER PRIMARY KEY, Player_ID INTEGER, Technique_ID INTEGER, Technique_Level REAL);
+CREATE TABLE IF NOT EXISTS Battles (ID INTEGER PRIMARY KEY, Player1_ID INTEGER, Player2_ID INTEGER, Used1 TEXT, Used2 TEXT, LastUpdated INTEGER);
+CREATE TABLE IF NOT EXISTS BattleEffects (ID INTEGER PRIMARY KEY, Battle_ID INTEGER, Player INTEGER, Effect_ID INTEGER, Power REAL)
+`;
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER,
 	Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER, Offset INTEGER, Arc INTEGER, LastArc INTEGER);
 CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT, Arc INTEGER);
-CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
-    Action_Level REAL, Garden_Level REAL, Glory INTEGER, Legacy_Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
-	NPC INTEGER);
+CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, 
+	Power_Level REAL, Health REAL, Health_Adjust REAL, Attack_Adjust REAL, Defense_Adjust REAL,
+	Fusion_ID INTEGER, Action_Level REAL, Garden_Level REAL, Glory INTEGER, Legacy_Glory INTEGER, Last_Active INTEGER, 
+	Last_Fought INTEGER, NPC INTEGER, Intent INTEGER);
 CREATE TABLE IF NOT EXISTS Config (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Key TEXT, Value TEXT);
 CREATE TABLE IF NOT EXISTS Status (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Type INTEGER,
 	StartTime INTEGER, EndTime INTEGER, Rating REAL);
-CREATE TABLE IF NOT EXISTS HeldItems (Channel TEXT, Player_ID INTEGER, Item_ID INTEGER, Count INTEGER, Decay_Time INTEGER);
-CREATE TABLE IF NOT EXISTS Items (ID INTEGER, Channel TEXT, Known INTEGER);
 CREATE TABLE IF NOT EXISTS Offers (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Target_ID INTEGER, Type INTEGER, Extra TEXT, Expires INTEGER);
-CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Size_Level REAL, Growth_Level REAL, Research_Level REAL);
-CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER, Slot INTEGER, Planter_ID INTEGER);
-CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Start_Time INTEGER, Form INTEGER, Max_Forms INTEGER, Last_Ruin_Update INTEGER, Base_Power REAL);
-CREATE TABLE IF NOT EXISTS Underlings (Channel TEXT, Player_ID INTEGER, Defeats INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Episode INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
-    Winner_Level REAL, Loser_Level REAL,
-	Winner_Skill REAL, Loser_Skill REAL,
 	Winner_Name TEXT, Loser_Name TEXT);
-CREATE TABLE IF NOT EXISTS Tournaments (Channel TEXT, Organizer_ID INTEGER, Status INTEGER, Type INTEGER, 
-    Round INTEGER, Reward INTEGER);
-CREATE TABLE IF NOT EXISTS TournamentPlayers (Channel TEXT, Player_ID INTEGER, Position INTEGER, Status INTEGER);
 CREATE TABLE IF NOT EXISTS Arcs (ID INTEGER PRIMARY KEY, Channel TEXT, Number INTEGER, Type INTEGER, Start_Time INTEGER, End_Time INTEGER);
+CREATE TABLE IF NOT EXISTS PlayerTechniques (ID INTEGER PRIMARY KEY, Player_ID INTEGER, Technique_ID INTEGER, Technique_Level REAL);
+CREATE TABLE IF NOT EXISTS Battles (ID INTEGER PRIMARY KEY, Player1_ID INTEGER, Player2_ID INTEGER, Used1 TEXT, Used2 TEXT, LastUpdated INTEGER);
+CREATE TABLE IF NOT EXISTS BattleEffects (ID INTEGER PRIMARY KEY, Battle_ID INTEGER, Player INTEGER, Effect_ID INTEGER, Power REAL);
 CREATE UNIQUE INDEX IF NOT EXISTS Worlds_Channel ON Worlds(Channel);
 CREATE UNIQUE INDEX IF NOT EXISTS Players_ID ON Players(ID); 
 CREATE UNIQUE INDEX IF NOT EXISTS Status_ChannelStatusRating ON Status(Channel, Player_ID, Type, Rating);
-CREATE UNIQUE INDEX IF NOT EXISTS HeldItems_ChannelPlayerItem ON HeldItems(Channel, Player_ID, Item_ID);
-CREATE UNIQUE INDEX IF NOT EXISTS Items_IDChannel ON Items(ID, Channel);
-CREATE UNIQUE INDEX IF NOT EXISTS Offers_ChannelPlayerTargetType ON Offers(Channel, Player_ID, Target_ID, Type);
-CREATE UNIQUE INDEX IF NOT EXISTS Gardens_Channel ON Gardens(Channel);
-CREATE UNIQUE INDEX IF NOT EXISTS Plants_ID ON Plants(ID);
-CREATE UNIQUE INDEX IF NOT EXISTS Nemesis_Channel ON Nemesis(Channel);
-CREATE UNIQUE INDEX IF NOT EXISTS Underlings_ChannelPlayer ON Underlings(Channel, Player_ID);
-CREATE UNIQUE INDEX IF NOT EXISTS Tournaments_Channel ON Tournaments(Channel);
-CREATE UNIQUE INDEX IF NOT EXISTS TournamentPlayers_ChannelPlayer ON TournamentPlayers(Channel, Player_ID);
+CREATE UNIQUE INDEX IF NOT EXISTS Offers_ChannelPlayerTargetType ON Offers(Channel, Player_ID, Target_ID, Type); 
 CREATE UNIQUE INDEX IF NOT EXISTS Config_PlayerKey ON Config(Player_ID, Key);
-`
+CREATE UNIQUE INDEX IF NOT EXISTS Battles_PlayerPlayer ON Battles(Player1_ID, Player2_ID)`;
 
 const newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
-DELETE FROM Gardens WHERE Channel = $channel;
-DELETE FROM Items WHERE Channel = $channel;
-INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Last_Wish, Start_Time, Episode) VALUES ($channel, 0, 0, 0, $now, 1);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (0, $channel, 0);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (1, $channel, 1);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (2, $channel, 0);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (3, $channel, 0);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (4, $channel, 0);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (5, $channel, 0);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (6, $channel, 0);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (10, $channel, 0);
-INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (11, $channel, 0);
-INSERT OR REPLACE INTO Gardens (Channel) VALUES ($channel)`;
+INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Last_Wish, Start_Time, Episode) VALUES ($channel, 0, 0, 0, $now, 1)`;
 
 const updatePlayerSql = `UPDATE Players SET
     Username = $username, 
 	Name = $name,
 	User_ID = $userId,
     Channel = $channel,
-    Power_Level = $powerLevel,
-    Garden_Level = $gardenLevel,
-    Action_Level = $actionLevel,
-    Garden_Level = $gardenLevel,
+	Power_Level = $powerLevel,
+	Health = $health,
+	Health_Adjust = $healthAdjust,
+	Attack_Adjust = $attackAdjust,
+	Defense_Adjust = $defenseAdjust,
 	Glory = $glory,
 	Legacy_Glory = $legacyGlory,
 	Last_Active = $lastActive,
 	Last_Fought = $lastFought,
-	NPC = $npc
+	NPC = $npc,
+	Intent = $intent
 WHERE ID = $id AND Channel = $channel`;
 
 const insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
-	Action_Level, Garden_Level, Glory, Last_Active, Last_Fought,
-	NPC) 
-VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $gardenLevel, $glory, 
-	$lastActive, $lastFought, $npc)`;
+	Health, Health_Adjust, Attack_Adjust, Defense_Adjust, Glory, Last_Active, Last_Fought,
+	NPC, Intent) 
+VALUES ($username, $userId, $name, $channel, $powerLevel, 
+	$health, $healthAdjust, $attackAdjust, $defenseAdjust,  $glory, $lastActive, $lastFought, 
+	$npc, $intent)`;
 
-const updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
-(Channel, Player_ID, Form, Max_Forms, Start_Time, Last_Ruin_Update, Base_Power)
-VALUES ($channel, $playerId, $form, $maxForms, $startTime, $lastRuinUpdate, $basePower)`;
+	
+const setConfig = async function(channel, playerId, key, value) {
+	let storageValue = value;
+	switch(enums.Configs.Type) {
+		case 'bool':
+			storageValue = value ? 1 : 0;
+			break;
+	}
+	await sql.run(`INSERT OR REPLACE INTO Config (Channel, Player_ID, Key, Value) VALUES ($channel, $playerId, $key, $value)`,
+		{
+			$channel: channel,
+			$playerId: playerId,
+			$key: key,
+			$value: storageValue
+		});
+}
 
 module.exports = {
 	// Sets up tables and such for an empty DB.
@@ -97,7 +90,7 @@ module.exports = {
 			await sql.run(query);
 		}
 	},
-	// Sets up basic Status/Item/Garden info for a new channel.
+	// Sets up basic Status info for a new channel.
     async initializeChannel(channel) {
 		const now = new Date().getTime();
         const queries = newChannelSql.split(';');
@@ -117,9 +110,6 @@ module.exports = {
 		if(!offset) offset = Math.floor(Math.random() * 1000);
 		await sql.run(`UPDATE Worlds SET Offset = $offset WHERE Channel = $channel`, {$offset: offset, $channel: channel});
 
-		// Make one random plant known
-		const knownPlant = Math.floor(Math.random() * 5) + 2;
-		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
 		console.log(`Channel ${channel} initialized`);
 		return await this.getWorld(channel);
 	},
@@ -131,16 +121,6 @@ module.exports = {
 			} catch(e) {
 				console.log(e);
 			}
-		}
-
-		let offset = (await sql.get(`SELECT Offset FROM Worlds ORDER BY ID`)).Offset;
-		await sql.run(`UPDATE Worlds SET Offset = $offset`, {$offset: offset});
-		if(!offset) offset = Math.floor(Math.random() * 1000);
-
-		const channels = (await sql.all(`SELECT Channel FROM Worlds`)).map(row => row.Channel);
-		for(const channel of channels) {
-			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (10, $channel, 0)`, {$channel: channel});
-			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (11, $channel, 0)`, {$channel: channel});
 		}
 	},
 	// Debug commands to run arbitrary SQL. Be careful, admin.
@@ -161,8 +141,6 @@ module.exports = {
 		const players = await this.getPlayers(channel);
 		const statusRows = await sql.all(`SELECT * FROM Status WHERE Channel = $channel AND Type = $type AND Player_ID IS NULL`, 
 			{$channel: channel, $type: enums.Statuses.Cooldown});
-		const orbRows = await sql.get(`SELECT SUM(Count) as Count FROM HeldItems WHERE Channel = $channel AND Item_ID = $type`,
-			{$channel: channel, $type: enums.Items.Orb});
 		if(row) {
 			const arcRow = await sql.get(`SELECT * FROM Arcs WHERE ID = $arc`, {$arc: row.Arc});
 			const lastArcRow = await sql.get(`SELECT * FROM Arcs WHERE ID = $arc`, {$arc: row.LastArc});
@@ -172,7 +150,6 @@ module.exports = {
 				heat: row.Heat,
 				resets: row.Resets,
 				population: players.length,
-				lostOrbs: orbRows ? 7 - orbRows.Count : 7,
 				lastWish: row.Last_Wish,
 				lastUpdate: row.Last_Update,
 				startTime: row.Start_Time,
@@ -251,33 +228,21 @@ module.exports = {
 				$name: player.name, 
 				$channel: player.channel, 
 				$powerLevel: player.level,
-				$actionLevel: player.actionLevel, 
-				$gardenLevel: player.gardenLevel, 
+				$health: player.hp,
+				$healthAdjust: player.hAdjust,
+				$attackAdjust: player.aAdjust,
+				$defenseAdjust: player.dAdjust,
 				$glory: player.glory, 
 				$lastActive: player.lastActive,
 				$lastFought: player.lastFought,
-				$npc: player.npc
+				$npc: player.npc,
+				$intent: player.intent
 			});
 		let playerId = result.lastID;
 		for(var i in player.config) {
-			this.setConfig(player.channel, playerId, i, player.config[i]);
+			setConfig(player.channel, playerId, i, player.config[i]);
 		}
 		return playerId;
-	},
-	async setConfig(channel, playerId, key, value) {
-		let storageValue = value;
-		switch(enums.Configs.Type) {
-			case 'bool':
-				storageValue = value ? 1 : 0;
-				break;
-		}
-		await sql.run(`INSERT OR REPLACE INTO Config (Channel, Player_ID, Key, Value) VALUES ($channel, $playerId, $key, $value)`,
-			{
-				$channel: channel,
-				$playerId: playerId,
-				$key: key,
-				$value: storageValue
-			});
 	},
 	// Updates a player's attributes.
     async setPlayer(player) {
@@ -288,17 +253,20 @@ module.exports = {
 			$userId: player.userId,
             $name: player.name,
             $channel: player.channel,
-            $powerLevel: player.level,
-            $gardenLevel: player.gardenLevel,
-            $actionLevel: player.actionLevel,
+			$powerLevel: player.level,
+			$health: player.hp,
+			$healthAdjust: player.hAdjust,
+			$attackAdjust: player.aAdjust,
+			$defenseAdjust: player.dAdjust,
 			$glory: player.glory,
 			$legacyGlory: player.legacyGlory,
 			$lastActive: player.lastActive,
 			$lastFought: player.lastFought,
-			$npc: player.npc
+			$npc: player.npc,
+			$intent: player.intent
 		});
 		for(var i in player.config) {
-			await this.setConfig(player.channel, player.id, i, player.config[i]);
+			await setConfig(player.channel, player.id, i, player.config[i]);
 		}
 	},
 	// Fetches a player from the database by character name.
@@ -364,18 +332,17 @@ module.exports = {
 			return await this.getPlayerInternal(row);
 		}
 	},
-	// Add Offers, Statuses and Items to a player and return it as a player object.
+	// Add Offers and Statuses to a player and return it as a player object.
     async getPlayerInternal(row) {
 		const now = new Date().getTime();
         const offerRows = await sql.all(`SELECT o.*, p.Name FROM Offers o 
 			LEFT JOIN Players p ON o.Player_ID = p.ID
 			WHERE o.Target_ID = $id OR (o.Target_ID IS NULL AND o.Player_ID <> $id AND o.Channel = $channel)`, {$id: row.ID, $channel: row.Channel});
-		const itemRows = await sql.all(`SELECT DISTINCT * FROM HeldItems WHERE Player_ID = $id`, {$id: row.ID});
 		const statusRows = await sql.all(`SELECT * FROM Status WHERE Player_ID = $id`, {$id: row.ID});
-		const nemesisRow = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: row.Channel});
 		const configRows = await sql.all(`SELECT * FROM Config WHERE Player_ID = $id`, {$id: row.ID});
+		const techniqueRows = await sql.all(`SELECT * FROM PlayerTechniques WHERE Player_ID = $id`, {$id: row.ID});
 		const fusionIds = (await sql.all(`SELECT ID FROM Players WHERE Fusion_ID = $id AND ID != $id`, {$id: row.ID})).map(row => row.ID);
-		const underlingsRows = await this.getUnderlings(row.Channel);
+		const battleRow = await sql.get(`SELECT * FROM Battles WHERE Player1_ID = $id OR Player2_ID = $id`, {$id: row.ID});
 
 		let player = {
 			id: row.ID,
@@ -388,9 +355,13 @@ module.exports = {
 			legacyGlory: row.Legacy_Glory,
 			lastActive: row.NPC ? now : row.Last_Active,
 			lastFought: row.NPC ? now : row.Last_Fought,
-			gardenLevel: row.Garden_Level,
-			actionLevel: row.Action_Level,
+			hp: row.Health,
+			hAdjust: row.Health_Adjust,
+			aAdjust: row.Attack_Adjust,
+			dAdjust: row.Defense_Adjust,
 			npc: row.NPC,
+			intent: row.Intent,
+			battleId: battleRow ? battleRow.ID : null,
 			config: {},
 			cooldowns: statusRows.filter(s => s.Type == enums.Statuses.Cooldown).map(c => { return {
 				id: c.ID,
@@ -413,11 +384,12 @@ module.exports = {
 				priority: enums.Statuses.Priority[s.Type],
 				startTime: s.StartTime,
 				endTime: s.EndTime,
-				rating: s.Rating
+				rating: s.Rating,
+				ends: enums.Statuses.Ends[s.type]
 			}}),
-			items: itemRows.map(i => { return {
-				type: i.Item_ID,
-				count: i.Count
+			techs: techniqueRows.map(t => { return {
+				id: t.Technique_ID,
+				level: t.Technique_Level
 			}}),
 			fusionId: row.Fusion_ID,
 			fusedPlayers: []
@@ -448,13 +420,6 @@ module.exports = {
 			} else {
 				player.config[i] = enums.Configs.Defaults[i];
 			}
-		}
-		
-		player.isNemesis = nemesisRow && nemesisRow.Player_ID == player.id;
-		const underling = underlingsRows.find(h => h.id == player.id);
-		if(underling) {
-			player.isUnderling = true;
-			player.underlingDefeats = underling.defeats;
 		}
 		
 		return player;
@@ -496,42 +461,6 @@ module.exports = {
 				$rating: rating ? rating : 0 // Null doesn't index properly
 			});
 	},
-	// Start a new plant.
-	async addPlant(player, plantType, slot) {
-		const now = new Date().getTime();
-		await sql.run(`INSERT INTO Plants (Channel, Planter_ID, Plant_Type, StartTime, Slot) VALUES ($channel, $planterId, $type, $startTime, $slot)`, 
-			{$channel: player.channel, $planterId: player.id, $type: plantType, $startTime: now, $slot: slot});
-	},
-	// Gives a new item to a player
-	async addItems(channel, playerId, itemId, count) {
-		const now = new Date().getTime();
-		if(count == 0) return;
-		const existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
-			{$playerId: playerId, $itemId: itemId});
-		if(existingItem) {
-			const newCount = existingItem.Count + count;
-			if(newCount <= 0) {
-				await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
-					{$playerId: playerId, $itemId: itemId});
-			} else {
-				await sql.run(`UPDATE HeldItems SET Count = $count WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
-					{$playerId: playerId, $itemId: itemId, $count: newCount});
-			}
-		} else if(count > 0) {
-			await sql.run(`INSERT INTO HeldItems (Channel, Player_ID, Item_ID, Count) VALUES
-				($channel, $playerId, $itemId, $count)`,
-				{$channel: channel, $playerId: playerId, $itemId: itemId, $count: count});
-		}
-	},
-	async setPlant(plant) {
-		await sql.run(`UPDATE Plants SET Plant_Type = $type, StartTime = $startTime WHERE ID = $id`, 
-			{$type: plant.type, $startTime: plant.startTime, $id: plant.id});
-	},
-	async setGarden(garden) {
-		await sql.run(`UPDATE Gardens SET Growth_Level = $growthLevel, Research_Level = $researchLevel,
-			Size_Level = $sizeLevel WHERE Channel = $channel`, 
-			{$growthLevel: garden.growthLevel, $researchLevel: garden.researchLevel, $sizeLevel: garden.sizeLevel, $channel: garden.channel});
-	},
 	async setStatus(status) {
 		await sql.run(`UPDATE Status SET StartTime = $startTime, EndTime = $endTime WHERE ID = $id`, 
 			{$startTime: status.startTime, $endTime: status.endTime, $id: status.id});
@@ -548,7 +477,6 @@ module.exports = {
 	async annihilatePlayer(playerId) {
 		await sql.run(`DELETE FROM Status WHERE Player_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
-		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`UPDATE Players SET Fusion_ID = NULL WHERE Fusion_ID = $playerId`, {$playerId: playerId});
 	},
 	// Delete a Status.
@@ -559,110 +487,15 @@ module.exports = {
 	async deleteOfferById(id) {
 		await sql.run(`DELETE FROM Offers WHERE ID = $id`, {$id: id});
 	},
-	// Delete a Player and all associated items/statuses.
+	// Delete a Player and all associated statuses.
 	async deletePlayer(playerId) {
 		await sql.run(`DELETE FROM Players WHERE ID = $playerId`, {$playerId: playerId});
-		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM Status WHERE Player_ID = $playerId`, {$playerId: playerId});
-		await sql.run(`DELETE FROM Underlings WHERE Player_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
-	},
-	// Delete a Plant.
-	async deletePlant(plantId) {
-		await sql.run(`DELETE FROM Plants WHERE ID = $plantId`, {$plantId: plantId});
-	},
-	// Get Nemesis info for a channel.
-	async getNemesis(channel) {
-		const row = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
-		if(row) {
-			const nemesis = {
-				id: row.Player_ID,
-				channel: row.Channel,
-				form: row.Form,
-				maxForms: row.Max_Forms,
-				startTime: row.Start_Time,
-				lastRuinUpdate: row.Last_Ruin_Update,
-				basePower: row.Base_Power
-			};
-			return nemesis;
-		} else {
-			return null;
-		}
-	},
-	// Get the history of players who fought the Nemesis.
-	async getNemesisHistory(channel) {
-		const nemesis = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
-		if(nemesis) {
-			const rows = await sql.all(`SELECT h.*, l.Name, l.Glory FROM History h
-			LEFT JOIN Players l ON l.ID = h.Loser_ID
-			WHERE h.Winner_ID = $nemesisId AND h.Battle_Time > $nemesisTime`, {$nemesisId: nemesis.Player_ID, $nemesisTime: nemesis.Start_Time});
-			const history = rows.map(r => {
-				return {
-					name: r.Name,
-					glory: r.Glory,
-					id: r.Loser_ID
-				};
-			});
-			
-			return history;
-		} else {
-			return [];
-		}
-	},
-	// Update Nemesis data.
-    async setNemesis(channel, nemesis) {
-        // Update the nemesis in the DB
-        await sql.run(updateNemesisSql, {
-			$channel: channel,
-            $playerId: nemesis.id,
-			$form: nemesis.form,
-			$maxForms: nemesis.maxForms,
-			$startTime: nemesis.startTime,
-			$lastRuinUpdate: nemesis.lastRuinUpdate,
-			$basePower: nemesis.basePower
-        });
-	},
-	// Get Garden info.
-	async getGarden(channel) {
-		const gardenRow = await sql.get(`SELECT * FROM Gardens WHERE Channel = $channel`, {$channel: channel});
-		const plantRows = await sql.all(`SELECT * FROM Plants WHERE Channel = $channel ORDER BY Slot`, {$channel: channel});
-		const itemRows = await sql.all(`SELECT * FROM Items WHERE Channel = $channel`, {$channel: channel});
-		if(gardenRow) {
-			let garden = {
-				channel: channel,
-				growthLevel: gardenRow.Growth_Level ? gardenRow.Growth_Level : 0,
-				researchLevel: gardenRow.Research_Level ? gardenRow.Research_Level : 0,
-				sizeLevel: gardenRow.Size_Level ? gardenRow.Size_Level : 0,
-			};
-			garden.plants = plantRows.map(p => { return {
-				id: p.ID,
-				planterId: p.Planter_ID,
-				slot: p.Slot,
-				type: p.Plant_Type,
-				name: enums.Items.Name[p.Plant_Type],
-				growTime: enums.Items.GrowTime[p.Plant_Type],
-				startTime: p.StartTime,
-				endTime: p.StartTime + (enums.Items.GrowTime[p.Plant_Type] * hour / (1 + 0.1 * garden.growthLevel))
-			}});
-			garden.plantTypes = itemRows.map(i => { return {
-				id: i.ID,
-				known: i.Known
-			}});
-			garden.slots = Math.min(Math.floor(garden.sizeLevel), 6);
-
-			return garden;
-		} else {
-			null;
-		}
 	},
 	// Delete all offers for a player who was just defeated.
 	async deleteOffersForPlayer(playerId) {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
-	},
-	// Delete all guarding of or from a player who was just defeated.
-	async deleteGuardingForPlayer(playerId) {
-		await sql.run(`DELETE FROM Status WHERE Type = $type AND (Player_ID = $playerId OR Rating = $playerId)`, 
-			{$playerId: playerId, $type: enums.Statuses.Guarded});
 	},
 	// Delete all open offers of a given type
 	async deleteOpenOffers(playerId, type) {
@@ -707,7 +540,9 @@ module.exports = {
 		const offerRows = await sql.all(`SELECT * FROM Offers
 			WHERE Channel = $channel AND Expires < $fivemins`, {$channel: channel, $fivemins: now - (5 * 60 * 1000)});
 		const statusRows = (await sql.all(`SELECT * FROM Status
-			WHERE Channel = $channel`, {$channel: channel})).filter(row => row.EndTime && row.EndTime < now);
+			WHERE Channel = $channel`, {$channel: channel}))
+			.filter(row => row.EndTime && row.EndTime < now)
+			.filter(row => enums.Statuses.Ends[row.Type]);
 		
 		return {
 			offers: offerRows.map(o => { return {
@@ -754,25 +589,11 @@ module.exports = {
 		const now = new Date().getTime();
 		await sql.run(`UPDATE Worlds SET Heat = 0, Resets = Resets + 1, Episode = 1, Start_Time = $now WHERE Channel = $channel`,
 			{$channel: channel, $now: now});
-		await sql.run(`UPDATE Gardens SET Growth_Level = 0, Research_Level = 0, Size_Level = 0
-			WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Status WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Offers WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Underlings WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM History WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM TournamentPlayers WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Plants WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Players WHERE Channel = $channel AND NPC > 0`, {$channel: channel});
 		await sql.run(`DELETE FROM Episodes WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`UPDATE Items SET Known = 0 WHERE Channel = $channel`, {$channel: channel});
-
-		// Make one random plant known
-		const knownPlant = Math.floor(Math.random() * 5) + 2;
-		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
-		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = 1 AND Channel = $channel`, {$channel: channel});
 
 		// Start the first arc
 		const result = await sql.run('INSERT INTO Arcs (Channel, Number, Type, Start_Time) VALUES ($channel, 1, 0, $now)',
@@ -795,25 +616,13 @@ module.exports = {
 		if(!channel || !importChannel) return;
 		await sql.run(`DELETE FROM Worlds WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Players WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Items WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Offers WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Status WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Gardens WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Plants WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Underlings WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM History WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`UPDATE Worlds SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
 		await sql.run(`UPDATE Players SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
-		await sql.run(`UPDATE Items SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
-		await sql.run(`UPDATE HeldItems SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
 		await sql.run(`UPDATE Offers SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
 		await sql.run(`UPDATE Status SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
-		await sql.run(`UPDATE Gardens SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
-		await sql.run(`UPDATE Plants SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
-		await sql.run(`UPDATE Nemesis SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
-		await sql.run(`UPDATE Underlings SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
 		await sql.run(`UPDATE History SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
 	},
 	async autofight(channel, targetName) {
@@ -882,32 +691,6 @@ module.exports = {
 			return [];
 		}
 	},
-	async researchPlant(channel, plantId) {
-		await sql.run(`UPDATE Items SET Known = 1 WHERE Channel = $channel AND ID = $id`, {$channel: channel, $id: plantId});
-	},
-	async setUnderling(channel, playerId, isUnderling) {
-		if(isUnderling) {
-			await sql.run(`INSERT OR REPLACE INTO Underlings (Channel, Player_ID, Defeats) VALUES ($channel, $id, 0)`, {$channel: channel, $id: playerId});
-		} else {
-			await sql.run(`DELETE FROM Underlings WHERE Channel = $channel AND Player_ID = $id`, {$channel: channel, $id: playerId});
-		}
-	},
-	async getUnderlings(channel) {
-		return await sql.all(`SELECT Player_ID AS id, Defeats as defeats FROM Underlings WHERE Channel = $channel`, {$channel: channel});
-	},
-	async endNemesis(channel) {
-		await sql.run(`DELETE FROM Underlings WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Status WHERE Channel = $channel AND Type = 3`, {$channel: channel});
-		await sql.run(`DELETE FROM Status WHERE Channel = $channel AND Type = 13 AND Player_ID IS NULL AND Rating = 12`, {$channel: channel});
-		await sql.run(`UPDATE Nemesis SET Player_ID = NULL WHERE Channel = $channel`, {$channel: channel});
-		await this.deleteRecruitOffers(channel);
-	},
-	async deleteRecruitOffers(channel) {
-		await sql.run(`DELETE FROM Offers WHERE Channel = $channel AND Type = 2`, {$channel: channel});
-	},
-	async recordUnderlingDefeat(channel, playerId) {
-		return await sql.all(`UPDATE Underlings SET Defeats = Defeats + 1 WHERE Channel = $channel AND Player_ID = $id`, {$channel: channel, $id: playerId});
-	},
 	async fastForward(channel, time) {
 		await sql.run(`UPDATE Worlds SET Last_Update = Last_Update + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
@@ -917,10 +700,6 @@ module.exports = {
 		await sql.run(`UPDATE Status SET StartTime = StartTime + $time, EndTime = EndTime + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
 		await sql.run(`UPDATE Offers SET Expires = Expires + $time WHERE Channel = $channel`,
-			{$channel: channel, $time: time});
-		await sql.run(`UPDATE Plants SET StartTime = StartTime + $time WHERE Channel = $channel`,
-			{$channel: channel, $time: time});
-		await sql.run(`UPDATE Nemesis SET Start_Time = Start_Time + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
 		await sql.run(`UPDATE Arcs SET Start_Time = Start_Time + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
@@ -942,9 +721,6 @@ module.exports = {
 		await sql.run(`DELETE FROM Offers WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`UPDATE Status SET EndTime = $now - 1 WHERE Channel = $channel`, {$channel: channel});
 	},
-	async scatterOrbs(channel) {
-		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel AND Item_ID = 0`, {$channel: channel});
-	},
 	async getEpisode(channel, episode) {
 		return await sql.get(`SELECT ID as id, Air_Date as airDate, Summary as summary FROM Episodes WHERE ID = $episode AND Channel = $channel`,
 			{$channel: channel, $episode: episode});
@@ -955,74 +731,6 @@ module.exports = {
 		await sql.run(`INSERT INTO Episodes (ID, Channel, Air_Date, Summary) VALUES ($id, $channel, $airDate, $summary)`, 
 			{$id: episodeNumber, $channel: channel, $airDate: new Date().getTime(), $summary: summary});
 		await sql.run(`UPDATE Worlds SET Episode = $episode WHERE Channel = $channel`, {$channel: channel, $episode: episodeNumber + 1});
-	},
-	async getTournament(channel) {
-		const tournamentRow = await sql.get(`SELECT * FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
-		const playerRows = await sql.all(`SELECT t.*, p.Name FROM TournamentPlayers t
-			LEFT JOIN Players p ON p.ID = t.Player_ID
-			WHERE t.Channel = $channel ORDER BY t.Position`, {$channel: channel});
-
-		if(!tournamentRow) {
-			return null;
-		}
-
-		let players = []
-		for(const row of playerRows) {
-			while(players.length < row.Position) {
-				players.push(null);
-			}
-			players.push({
-				id: row.Player_ID,
-				name: row.Name,
-				position: row.Position,
-				status: row.Status
-			});
-		}
-
-		let tournament = {
-			channel: tournamentRow.Channel,
-			organizerId: tournamentRow.Organizer_ID,
-			status: tournamentRow.Status,
-			type: tournamentRow.Type,
-			round: tournamentRow.Round,
-			reward: tournamentRow.Reward,
-			players: players
-		};
-
-		return tournament;
-	},
-	async setTournament(tournament) {
-		await sql.run(`INSERT OR REPLACE INTO Tournaments (Channel, Organizer_ID, Status, Type, Round, Reward) VALUES ` +
-			`($channel, $organizerId, $status, $type, $round, $reward)`, {
-				$channel: tournament.channel,
-				$organizerId: tournament.organizerId,
-				$status: tournament.status,
-				$type: tournament.type,
-				$round: tournament.round,
-				$reward: tournament.reward
-			});
-		if(tournament.players) {
-			for(const player of tournament.players) {
-				if(player) {
-					const existingPlayer = await sql.get(`SELECT * FROM TournamentPlayers WHERE Player_ID = $id`, {$id: player.id});
-					if(existingPlayer) {
-						await sql.run(`UPDATE TournamentPlayers SET Position = $position, Status = $status WHERE Player_ID = $id`, 
-							{$id: player.id, $position: player.position, $status: player.status});
-					} else {
-						await this.joinTournament(tournament.channel, player.id, player.position);
-					}
-				}
-			}
-		} else {
-			await sql.run(`DELETE FROM TournamentPlayers WHERE Channel = $channel`, {$channel: tournament.channel});
-		}
-	},
-	async joinTournament(channel, id, position) {
-		await sql.run(`INSERT OR REPLACE INTO TournamentPlayers (Channel, Player_ID, Position) VALUES ($channel, $id, $position)`, 
-			{$channel: channel, $id: id, $position: position});
-	},
-	async eliminatePlayer(id) {
-		await sql.run(`DELETE FROM TournamentPlayers WHERE Player_ID = $id`, {$id: id});
 	},
 	async worldExists(channel) {
 		const dbExists = await sql.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='Worlds'`);
@@ -1061,35 +769,67 @@ module.exports = {
 			{$channel: channel, $number: number, $type: type, $now: now});
 		await sql.run(`UPDATE Worlds SET Arc = $arc WHERE Channel = $channel`, {$arc: result.lastID, $channel: channel});
 	},
-	async getPortal(channel) {
-		const portal = await sql.get(`SELECT * FROM Portals WHERE Channel = $channel`, {$channel: channel});
-		if(!portal) return null;
-		return {
-			id: portal.ID,
-			channel: portal.Channel,
-			targetChannel: portal.TargetChannel,
-			energyBuffs: portal.EnergyBuffs
-		};
+	async addTechnique(player, techId) {
+		await sql.run(`INSERT OR REPLACE INTO PlayerTechniques (Player_ID, Technique_ID, Technique_Level) VALUES ($playerId, $techniqueId, 1)`,
+			{$playerId: player.id, $techniqueId: techId});
 	},
-	async newPortal(channel, targetChannel) {
-		await sql.run(`INSERT OR REPLACE INTO Portals (Channel, TargetChannel, EnergyBuffs) VALUES ($channel, $targetChannel, 0)`,
-			{$channel: channel, $targetChannel: targetChannel});
-		await sql.run(`INSERT OR REPLACE INTO Portals (Channel, TargetChannel, EnergyBuffs) VALUES ($channel, $targetChannel, 0)`,
-			{$channel: targetChannel, $targetChannel: channel});
+	async setIntent(player, intent) {
+		await sql.run(`UPDATE Players SET Intent = $intent WHERE ID = $playerId`, {$playerId: player.id, $intent: intent});
 	},
-	async setPortal(portal) {
-		await sql.run(`UPDATE Portals SET TargetChannel = $targetChannel, EnergyBuffs = $energyBuffs WHERE Channel = $channel`,
-			{$targetChannel: portal.targetChannel, $energyBuffs: portal.energyBuffs, $channel: portal.channel});
+	async newBattle(player1, player2) {
+		let now = new Date().getTime();
+		await sql.run(`INSERT OR REPLACE INTO Battles (Player1_ID, Player2_ID, Used1, Used2, LastUpdated) VALUES ($p1, $p2, '', '', $now)`,
+			{$p1: player1.id, $p2: player2.id, $now: now});
 	},
-	async deletePortal(channel, targetChannel) {
-		await sql.run(`DELETE FROM Portals WHERE Channel = $channel AND TargetChannel = $targetChannel`,
-			{$channel: channel, $targetChannel: targetChannel});
-		await sql.run(`DELETE FROM Portals WHERE Channel = $channel AND TargetChannel = $targetChannel`,
-			{$channel: channel, $targetChannel: targetChannel});
+	async getBattle(player1Id, player2Id) {
+		let battleRow = await sql.get(`SELECT * FROM Battles WHERE Player1_ID = $p1 AND Player2_ID = $p2`,
+			{$p1: player1Id, $p2: player2Id});
+		let effectsRows = await sql.all(`SELECT * FROM BattleEffects WHERE Battle_ID = $bid`, {$bid: battleRow.ID});
+
+		if(battleRow) {
+			return {
+				id: battleRow.ID,
+				p1: await this.getPlayerById(battleRow.Player1_ID),
+				p2: await this.getPlayerById(battleRow.Player2_ID),
+				usedTechs1: battleRow.Used1.length == 0 ? [] : battleRow.Used1.split(','),
+				usedTechs2: battleRow.Used2.length == 0 ? [] : battleRow.Used2.split(','),
+				effects1: effectsRows.filter(e => e.Player == 1).map(e => { return {
+					id: e.Effect_ID,
+					power: e.Power
+				}}),
+				effects2: effectsRows.filter(e => e.Player == 2).map(e => { return {
+					id: e.Effect_ID,
+					power: e.Power
+				}}),
+				log: []
+			};
+		} else {
+			return null;
+		}
 	},
-	async guarding(player) {
-		const guarding = await sql.get(`SELECT * FROM Status WHERE Type = $type AND Rating = $rating`, {$type: enums.Statuses.Guarded, $rating: player.id});
-		if(!guarding) return null;
-		return await this.getPlayerById(player.channel, guarding.Player_ID);
+	async setBattle(battle) {
+		let now = new Date().getTime();
+		await sql.run(`UPDATE Battles SET Used1 = $used1, Used2 = $used2, LastUpdated = $now`, 
+			{$used1: battle.usedTechs1.join(','), $used2: battle.usedTechs2.join(','), $now: now});
+	},
+	async endBattle(bid) {
+		await sql.run(`DELETE FROM Battles WHERE ID = $bid`, {$bid: bid});
+		await sql.run(`DELETE FROM BattleEffects WHERE Battle_ID = $bid`, {$bid: bid});
+	},
+	async addBattleEffect(battle, effectId, power, player) {
+		await sql.run(`INSERT INTO BattleEffects (Battle_ID, Player, Effect_ID, Power) VALUES ($bid, $player, $eid, $power)`, 
+			{$bid: battle.id, $player: player, $eid: effectId, $power: power});
+	},
+	async cleanupBattles() {
+		const cutoff = new Date().getTime() - (1000 * 60 * 5);
+		let bids = await sql.all(`SELECT ID FROM Battles
+			WHERE LastUpdated < $cutoff`, {$cutoff: cutoff});
+		for(const i in bids) {
+			await this.endBattle(bids[i].ID);
+		}
+	},
+	async trainTechnique(playerId, techId, exp) {
+		await sql.run(`UPDATE PlayerTechniques SET Technique_Level = Technique_Level + $exp WHERE Player_ID = $pid AND Technique_ID = $tid`,
+			{$exp: exp, $pid: playerId, $tid: techId});
 	}
 }
