@@ -515,7 +515,7 @@ module.exports = {
 
 		const oldMaxHp = this.getMaxHP(player);
 		const oldAtk = this.getAttack(player);
-		const oldDef = this.getAttack(player);
+		const oldDef = this.getDefense(player);
 
 		await this.deleteStatus(player, enums.Statuses.Journey);
 		await this.deleteStatus(player, enums.Statuses.Training);
@@ -1080,10 +1080,27 @@ module.exports = {
 					messages.push(`**${player.name}** is ready to fight.`);
 					player.hp = this.getMaxHP(player);
 					await sql.setPlayer(player);
-					if(player.config.AutoTrain) {
-						messages.push(`**${player.name}** has begun training.`);
+					if(player.config.AutoTrain && player.config.AutoTrain != 'Off' && player.config.AutoTrain != 'false') {
 						await this.deleteStatus(player, enums.Statuses.Ready);
-						await sql.addStatus(channel, player.id, enums.Statuses.Training);
+						let trainingType = enums.TrainingTypes.Neutral;
+						switch(player.config.AutoTrain) {
+							case 'Attack':
+								trainingType = enums.TrainingTypes.Attack;
+								messages.push(`**${player.name}** has begun training, prioritizing Attack.`);
+								break;
+							case 'Defense':
+								trainingType = enums.TrainingTypes.Defense;
+								messages.push(`**${player.name}** has begun training, prioritizing Defense.`);
+								break;
+							case 'Health':
+								trainingType = enums.TrainingTypes.Health;
+								messages.push(`**${player.name}** has begun training, prioritizing Health.`);
+								break;
+							default:
+								messages.push(`**${player.name}** has begun training.`);
+								break;
+						}
+						await sql.addStatus(channel, player.id, enums.Statuses.Training, 0, trainingType);
 					} else if(player.isUnderling) {
 						const message = await this.underlingPowerup(player);
 						if(message) messages.push(message);
@@ -1206,20 +1223,32 @@ module.exports = {
 	async config(player, configFlag, value) {
 		if(configFlag) {
 			// Update the config
-			switch(configFlag.toLowerCase()) {
+			let cf = configFlag.toLowerCase();
+			let v = value.toLowerCase();
+			switch(cf) {
 				case 'alwaysprivate':
-					player.config.AlwaysPrivate = this.readConfigBoolean(value, player.config.AlwaysPrivate);
+					player.config.AlwaysPrivate = this.readConfigBoolean(v, player.config.AlwaysPrivate);
 					break;
 				case 'ping':
-					player.config.Ping = this.readConfigBoolean(value, player.config.Ping);
+					player.config.Ping = this.readConfigBoolean(v, player.config.Ping);
 					break;
 				case 'autotrain':
-					player.config.AutoTrain = this.readConfigBoolean(value, player.config.autoTrain);
+					if(v == 'off') {
+						player.config.AutoTrain = 'Off';
+					} else if('attack'.startsWith(v)) {
+						player.config.AutoTrain = 'Attack';
+					} else if('defense'.startsWith(v)) {
+						player.config.AutoTrain = 'Defense';
+					} else if('health'.startsWith(v) || v == 'hp') {
+						player.config.AutoTrain = 'Health';
+					} else {
+						player.config.AutoTrain = 'On';
+					}
 					break;
 				case 'pronoun':
-					if(value.toLowerCase() == 'he') {
+					if(v.startsWith('he')) {
 						player.config.Pronoun = 'he';
-					} else if(value.toLowerCase() == 'she') {
+					} else if(v.startsWith('she')) {
 						player.config.Pronoun = 'she';
 					} else {
 						player.config.Pronoun = 'they';
@@ -1238,7 +1267,7 @@ module.exports = {
 			.setColor(0x00AE86);
 		let output = `AlwaysPrivate: ${config.AlwaysPrivate ? 'On' : 'Off'}\n`;
 		output += `Ping: ${config.Ping ? 'On' : 'Off'}\n`;
-		output += `AutoTrain: ${config.AutoTrain ? 'On' : 'Off'}\n`;
+		output += `AutoTrain: ${config.AutoTrain ? config.AutoTrain : 'Off'}\n`;
 		output += `Pronoun: ${config.Pronoun}`;
 		embed.setDescription(output);
 
@@ -1286,8 +1315,7 @@ module.exports = {
 		const p = Math.sqrt(player.level);
 		return Math.ceil(p * player.dAdjust * settings.DefenseMultiplier);
 	},
-	readConfigBoolean(value, oldValue) {
-		const v = value ? value.toLowerCase() : null;
+	readConfigBoolean(v, oldValue) {
 		if(v == 'off' || v == '0' || v == 'false') {
 			return false;
 		} else if(v == 'on' || v == '1' || v == 'true') {

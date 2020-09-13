@@ -190,6 +190,33 @@ module.exports = {
 					}
 				}
 				break;
+			case 'config':
+				this.validatePlayerRegistered(errors, player);
+				if(args.length > 1) {
+					let config = args[0].toLowerCase();
+					let value = args[1].toLowerCase();
+					switch(config) {
+						case 'alwaysprivate':
+						case 'ping':
+							if(!(value == 'off' || value == '0' || value == 'false' ||
+							value == 'on' || value == '1' || value == 'true')) {
+								errors.push('Accepted values: On, Off');
+							}
+							break;
+						case 'pronoun':
+							if(!(value.startsWith('he') || value.startsWith('she') || value.startsWith('they'))) {
+								errors.push('Accepted values: He, She, They');
+							}
+							break;
+						case 'autotrain':
+							if(!(value == 'off' || value == 'on' || 'attack'.startsWith(value) || 'defense'.startsWith(value) ||
+								'health'.startsWith(value) || value == 'hp')) {
+								errors.push('Accepted values: Off, On, Attack, Defense, Health');
+							}
+							break;
+					}
+				}
+				break;
 			case 'deepcheck':
 			case 'season':
 			case 'taunt':

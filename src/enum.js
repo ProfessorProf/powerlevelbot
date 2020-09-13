@@ -63,7 +63,7 @@ module.exports = {
             AlwaysPrivate: 'bool',
             Ping: 'bool',
             Pronoun: 'text',
-            AutoTrain: 'bool'
+            AutoTrain: 'text'
         }
     },
     FightSummaries: {

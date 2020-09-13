@@ -335,8 +335,12 @@ async function handleMessage(message) {
 				} else {
 					message.channel.send(m)
 						.then((sentMessage) => {
-							if(output.fight) {
-								fight.continueFight(player, target, sentMessage);
+							if(output.fight && sentMessage.embeds && sentMessage.embeds.length > 0) {
+								// Ensure this is the fight embed
+								let embed = sentMessage.embeds[0];
+								if(embed && embed.title.includes(' vs ')) {
+									fight.continueFight(player, target, sentMessage);
+								}
 							}
 						});
 				}
